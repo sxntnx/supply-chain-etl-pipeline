@@ -93,8 +93,8 @@ to keep the analytical queries fast.
 
 ### 1. Clone and install
 ```bash
-git clone https://github.com/sxntnx/supply-chain-etl.git
-cd supply-chain-etl
+git clone https://github.com/sxntnx/supply-chain-etl-pipeline.git
+cd supply-chain-etl-pipeline
 pip install -r requirements.txt
 ```
 
