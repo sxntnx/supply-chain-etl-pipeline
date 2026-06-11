@@ -150,6 +150,14 @@ sqlite3 database/supply_chain.db < sql/analytics_queries.sql
 | 4 | Top 10 products by revenue and their margin |
 | 5 | Late-delivery rate by customer segment |
 
+And `scripts/plot_kpis.py` renders these into a dashboard image:
+
+```bash
+python scripts/plot_kpis.py     # → reports/kpi_dashboard.png
+```
+
+![KPI dashboard](reports/kpi_dashboard.png)
+
 ---
 
 ## Project structure
@@ -164,9 +172,12 @@ supply-chain-etl/
 │   ├── load.py                 # Stage 3: write to SQLite + index
 │   └── utils.py                # Logger and helpers
 ├── scripts/
-│   └── generate_sample_data.py # Synthetic DataCo-style data generator
+│   ├── generate_sample_data.py # Synthetic DataCo-style data generator
+│   └── plot_kpis.py            # Render KPI dashboard image
 ├── sql/
 │   └── analytics_queries.sql   # Operational KPI queries
+├── reports/
+│   └── kpi_dashboard.png       # Generated KPI visuals
 ├── config.py                   # Paths and settings
 ├── main.py                     # Pipeline entry point
 ├── requirements.txt
