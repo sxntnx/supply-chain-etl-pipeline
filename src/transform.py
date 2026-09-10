@@ -51,7 +51,16 @@ def normalize_text(df: pd.DataFrame) -> pd.DataFrame:
     ]
     for col in text_cols:
         if col in df.columns:
-            df[col] = df[col].astype("string").str.strip().str.title()
+            df[col] = (
+                df[col]
+                .astype("string")
+                .str.strip()
+                .str.title()
+                # str.title() capitalizes after an apostrophe, which turns
+                # "Women's Apparel" into "Women'S Apparel". Undo that: the
+                # product name is now an entity key, and it has to read right.
+                .str.replace(r"(?<=\w)'S\b", "'s", regex=True)
+            )
     return df
 
 

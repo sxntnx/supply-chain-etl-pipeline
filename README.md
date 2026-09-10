@@ -149,7 +149,7 @@ Example run (synthetic 20K sample):
 2026-06-11 11:56:22 | INFO     | pipeline  | [2/3] TRANSFORM
 2026-06-11 11:56:22 | INFO     | transform | Removed 20 exact duplicate rows
 2026-06-11 11:56:22 | INFO     | transform | dim_customers: 2,500 unique customers
-2026-06-11 11:56:22 | INFO     | transform | dim_products:    400 unique products
+2026-06-11 11:56:22 | INFO     | transform | dim_products:    42 unique products
 2026-06-11 11:56:22 | INFO     | transform | fact_orders:   20,000 rows
 2026-06-11 11:56:22 | INFO     | pipeline  | [3/3] LOAD
 2026-06-11 11:56:22 | INFO     | load      | Database written to .../supply_chain.db

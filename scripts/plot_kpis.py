@@ -42,18 +42,20 @@ def load_frames(conn) -> tuple[pd.DataFrame, pd.DataFrame]:
         """,
         conn,
     )
-    profit_by_region = pd.read_sql_query(
+    by_region = pd.read_sql_query(
         """
         SELECT order_region,
                ROUND(SUM(order_profit), 0) AS total_profit
         FROM fact_orders
         GROUP BY order_region
         ORDER BY total_profit DESC
-        LIMIT 8
         """,
         conn,
     )
-    # Plot top region at the top of the horizontal bar chart.
+    # Both ends of the ranking: a top-N cut would hide the regions selling at
+    # a loss, which is the half of this chart worth acting on.
+    profit_by_region = pd.concat([by_region.head(5), by_region.tail(5)])
+    # Plot the most profitable region at the top of the horizontal bar chart.
     profit_by_region = profit_by_region.iloc[::-1].reset_index(drop=True)
     return late_by_mode, profit_by_region
 
@@ -92,7 +94,7 @@ def render(late_by_mode: pd.DataFrame, profit_by_region: pd.DataFrame) -> Path:
     # --- Panel 2: profit by region (positive vs negative) --------------------
     colors = [GOOD if v >= 0 else BAD for v in profit_by_region["total_profit"]]
     ax2.barh(profit_by_region["order_region"], profit_by_region["total_profit"], color=colors)
-    ax2.set_title("Top 8 regions by total profit", fontsize=12, fontweight="bold", pad=10)
+    ax2.set_title("Most and least profitable regions", fontsize=12, fontweight="bold", pad=10)
     ax2.set_xlabel("Total profit")
     ax2.axvline(0, color=INK, linewidth=0.8)
     ax2.spines[["top", "right"]].set_visible(False)

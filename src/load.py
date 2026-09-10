@@ -71,6 +71,12 @@ POSTGRES_DTYPES = {
     },
 }
 
+# SQLite caps the number of bound parameters in a single statement. Older
+# builds stop at 999; staying under that keeps the local run working on any
+# Python. PostgreSQL has no equivalent ceiling here, since psycopg2 renders
+# the values into the statement client-side.
+SQLITE_MAX_VARIABLES = 999
+
 # Primary keys applied after load, so the schema documents its own grain.
 PRIMARY_KEYS = {
     "fact_orders": "order_item_id",
@@ -107,6 +113,19 @@ def _table_dtypes(name: str) -> dict | None:
     if config.DB_BACKEND == "postgres":
         return POSTGRES_DTYPES.get(name)
     return None
+
+
+def _chunksize(frame: pd.DataFrame) -> int:
+    """Rows per INSERT, clamped so SQLite's parameter limit is never hit.
+
+    `method="multi"` folds every row of a chunk into one INSERT, so the bound
+    parameter count is rows x columns. A 10,000-row chunk of a 15-column table
+    is 150,000 parameters — fine for PostgreSQL, fatal for SQLite.
+    """
+    if config.DB_BACKEND == "postgres":
+        return config.LOAD_CHUNK_SIZE
+    columns = max(len(frame.columns), 1)
+    return max(min(config.LOAD_CHUNK_SIZE, SQLITE_MAX_VARIABLES // columns), 1)
 
 
 def _apply_constraints(engine: Engine, tables: dict[str, pd.DataFrame]) -> None:
@@ -150,7 +169,7 @@ def load(tables: dict[str, pd.DataFrame], db_path: Path = config.DATABASE_PATH) 
             if_exists="replace",
             index=False,
             dtype=_table_dtypes(name),
-            chunksize=config.LOAD_CHUNK_SIZE,
+            chunksize=_chunksize(frame),
             method="multi",
         )
         log.info("Wrote table '%s' (%s rows)", name, fmt_int(len(frame)))
