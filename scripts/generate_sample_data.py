@@ -254,7 +254,9 @@ def generate(rows: int) -> pd.DataFrame:
     order_dates = [base_date + timedelta(days=int(o)) for o in order_offsets]
 
     shipping_mode, scheduled, real_days = draw_shipping(rows)
-    ship_dates = [d + timedelta(days=int(r)) for d, r in zip(order_dates, real_days)]
+    ship_dates = [
+        d + timedelta(days=int(r)) for d, r in zip(order_dates, real_days, strict=True)
+    ]
 
     delay = real_days - scheduled
     delivery_status = np.where(

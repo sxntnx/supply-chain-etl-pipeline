@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Lint, test and run the pipeline
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Unit tests
+        run: pytest
+
+      # Proves the pipeline runs end to end on a clean machine. No DATABASE_URL
+      # is set here, so it loads into SQLite — the same extract and transform
+      # stages the PostgreSQL backend uses.
+      - name: End-to-end pipeline run
+        run: |
+          python scripts/generate_sample_data.py --rows 5000
+          python main.py
+          python scripts/plot_kpis.py

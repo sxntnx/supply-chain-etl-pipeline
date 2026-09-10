@@ -1,5 +1,9 @@
 # Supply Chain ETL Pipeline
 
+[![CI](https://github.com/sxntnx/supply-chain-etl-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/sxntnx/supply-chain-etl-pipeline/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.11-blue)
+![Tests](https://img.shields.io/badge/tests-31%20passing-brightgreen)
+
 An end-to-end ETL pipeline that extracts raw supply chain data, applies data
 quality transformations, and loads a normalized **star schema** into an
 analytical database — ready to answer real operational questions about
@@ -30,7 +34,7 @@ data/raw/
   └── DataCoSupplyChainDataset.csv
         │
         ▼
-   [extract.py]        → Load raw CSV (latin-1, 180K+ rows)
+   [extract.py]        → Load raw CSV (latin-1, 53 columns)
         │
         ▼
    [transform.py]      → Clean · Enrich · Split
@@ -119,6 +123,14 @@ runs end-to-end out of the box:
 python scripts/generate_sample_data.py --rows 20000
 ```
 
+The generator is not a column of random draws. It builds from a fixed catalog
+where a product is one entity — unique name, one category, one department, one
+list price — and a category belongs to exactly one department, so a rollup by
+category can never disagree with a rollup by department. The dimensions carry
+signal too: shipping mode sets the scheduled days and the odds of missing them,
+and margin varies by category and by region. Without that, every KPI cut comes
+out flat and the star schema has nothing to show.
+
 ### 3. Choose where the data lands
 
 **Option A — Cloud PostgreSQL (Neon).** Create a free project at
@@ -141,19 +153,23 @@ cp .env.example .env
 python main.py
 ```
 
-Example run (synthetic 20K sample):
+Example run (synthetic 20K sample, SQLite backend):
 ```
-2026-06-11 11:56:22 | INFO     | pipeline  | Supply Chain ETL Pipeline - START
-2026-06-11 11:56:22 | INFO     | pipeline  | [1/3] EXTRACT
-2026-06-11 11:56:22 | INFO     | extract   | Extracted 20,020 rows x 50 columns
-2026-06-11 11:56:22 | INFO     | pipeline  | [2/3] TRANSFORM
-2026-06-11 11:56:22 | INFO     | transform | Removed 20 exact duplicate rows
-2026-06-11 11:56:22 | INFO     | transform | dim_customers: 2,500 unique customers
-2026-06-11 11:56:22 | INFO     | transform | dim_products:    42 unique products
-2026-06-11 11:56:22 | INFO     | transform | fact_orders:   20,000 rows
-2026-06-11 11:56:22 | INFO     | pipeline  | [3/3] LOAD
-2026-06-11 11:56:22 | INFO     | load      | Database written to .../supply_chain.db
-2026-06-11 11:56:22 | INFO     | pipeline  | Pipeline completed in 0.34s
+2026-09-10 19:09:22 | INFO     | pipeline  | Supply Chain ETL Pipeline - START
+2026-09-10 19:09:22 | INFO     | pipeline  | [1/3] EXTRACT
+2026-09-10 19:09:22 | INFO     | extract   | Extracted 20,020 rows x 50 columns
+2026-09-10 19:09:22 | INFO     | pipeline  | [2/3] TRANSFORM
+2026-09-10 19:09:22 | INFO     | transform | Removed 20 exact duplicate rows
+2026-09-10 19:09:22 | INFO     | transform | dim_customers: 2,500 unique customers
+2026-09-10 19:09:22 | INFO     | transform | dim_products:    42 unique products
+2026-09-10 19:09:22 | INFO     | transform | fact_orders:   20,000 rows
+2026-09-10 19:09:22 | INFO     | pipeline  | [3/3] LOAD
+2026-09-10 19:09:22 | INFO     | load      | Backend: SQLite (database/supply_chain.db)
+2026-09-10 19:09:23 | INFO     | load      | Wrote table 'dim_customers' (2,500 rows)
+2026-09-10 19:09:23 | INFO     | load      | Wrote table 'dim_products' (42 rows)
+2026-09-10 19:09:25 | INFO     | load      | Wrote table 'fact_orders' (20,000 rows)
+2026-09-10 19:09:25 | INFO     | load      | Indexes created
+2026-09-10 19:09:25 | INFO     | pipeline  | Pipeline completed in 2.53s
 ```
 
 ---
@@ -187,12 +203,49 @@ python scripts/plot_kpis.py     # → reports/kpi_dashboard.png
 
 ![KPI dashboard](reports/kpi_dashboard.png)
 
+### What the queries return
+
+Against the synthetic 20K sample, loaded into Neon:
+
+| Shipping mode | Scheduled days | Order lines | Shipped late |
+|---------------|---------------:|------------:|-------------:|
+| Standard Class | 4 | 11,560 | 61.9% |
+| Second Class | 2 | 4,040 | 43.0% |
+| First Class | 1 | 2,769 | 27.7% |
+| Same Day | 0 | 1,631 | 11.2% |
+
+Margin ranges from 22.8% in Pet Shop accessories to 2.7% in electronics, and
+from 20.1% in Northern Europe to −3.8% in East Africa — two regions close the
+period underwater. Those are the cuts an operations team would act on.
+
+---
+
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest          # 31 tests
+ruff check .
+```
+
+Beyond the per-function unit tests, the suite pins the invariants that make the
+warehouse aggregatable, because these are exactly the ones that fail silently:
+
+- a product name resolves to one id, one category, one department, one price
+- a category never spans two departments
+- the selling price on a line tracks that product's list price
+- scheduled shipping days are a property of the shipping mode
+- the chunked load stays under SQLite's bound-parameter limit
+
+CI runs the linter, the test suite and a full pipeline run on every push.
+
 ---
 
 ## Project structure
 
 ```
 supply-chain-etl/
+├── .github/workflows/ci.yml    # Lint, tests and a full pipeline run
 ├── data/raw/                   # Source CSV lives here
 ├── database/                   # supply_chain.db (generated)
 ├── src/
@@ -202,15 +255,20 @@ supply-chain-etl/
 │   └── utils.py                # Logger and helpers
 ├── scripts/
 │   ├── generate_sample_data.py # Synthetic DataCo-style data generator
-│   └── plot_kpis.py            # Render KPI dashboard image
+│   ├── plot_kpis.py            # Render KPI dashboard image
+│   └── make_carousel.py        # Render the schema explainer slides
 ├── sql/
 │   └── analytics_queries.sql   # Operational KPI queries
+├── tests/                      # Unit tests + data integrity invariants
 ├── reports/
 │   └── kpi_dashboard.png       # Generated KPI visuals
 ├── config.py                   # Paths, backend selection, settings
+├── conftest.py                 # Puts the repo root on sys.path for tests
+├── pyproject.toml              # pytest and ruff configuration
 ├── .env.example                # Template for local credentials
 ├── main.py                     # Pipeline entry point
-├── requirements.txt
+├── requirements.txt            # Runtime dependencies
+├── requirements-dev.txt        # + pytest and ruff
 └── README.md
 ```
 
@@ -225,6 +283,8 @@ supply-chain-etl/
 - **Typed schema, not inferred** — explicit column types, primary keys and indexes are declared on load rather than left to pandas' inference, so the database documents its own grain.
 - **Credentials out of the repo** — the connection string is read from the environment via `.env`, which is git-ignored; `.env.example` documents the shape.
 - **Reproducible** — the synthetic generator means anyone can run the full pipeline without hunting down the source data.
+- **Integrity by construction** — the generator models a product as one entity and a category as belonging to one department, so the dimension it produces is joinable. Random draws per column would look fine row by row and fall apart on the first `GROUP BY`.
+- **Tested** — the transform functions have unit tests, and the invariants the star schema depends on are pinned by tests of their own. CI runs them plus an end-to-end pipeline run on every push.
 
 ---
 

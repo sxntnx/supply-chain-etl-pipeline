@@ -152,11 +152,11 @@ def before_after() -> Path:
             face = "#f9fafb"
             edge = GRID
             if c in (1, 2) and r > 0:          # PII columns
-                face = "#fee2e2"; edge = BAD
+                face, edge = "#fee2e2", BAD
             elif (r, c) in {(3, 5), (6, 8), (8, 3), (2, 9)}:  # nulls
-                face = "#fef3c7"; edge = AMBER
+                face, edge = "#fef3c7", AMBER
             elif r == 9:                        # duplicate row
-                face = "#fee2e2"; edge = BAD
+                face, edge = "#fee2e2", BAD
             ax.add_patch(FancyBboxPatch(
                 (x, y), cw * 0.9, ch * 0.8, boxstyle="square,pad=0",
                 linewidth=0.6, edgecolor=edge, facecolor=face, zorder=2))
