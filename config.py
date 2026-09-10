@@ -2,11 +2,18 @@
 Central configuration for the Supply Chain ETL pipeline.
 
 Keeping paths and settings in one place means no module hard-codes a
-filesystem location. Swapping environments (local → server) or the storage
-engine (SQLite → PostgreSQL) becomes a single-file change.
+filesystem location. The storage engine is selected here too: the pipeline
+loads into SQLite for a zero-setup local run, or into PostgreSQL (Neon) when
+a connection string is supplied. Nothing upstream of `load.py` changes.
 """
 
+import os
 from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Read a local .env if present. Never commit that file — see .env.example.
+load_dotenv()
 
 # --------------------------------------------------------------------------- #
 # Paths
@@ -21,8 +28,23 @@ DATABASE_DIR = BASE_DIR / "database"
 RAW_CSV_PATH = RAW_DIR / "DataCoSupplyChainDataset.csv"
 RAW_CSV_ENCODING = "latin-1"
 
-# Destination analytical database.
+# Destination analytical database (SQLite backend).
 DATABASE_PATH = DATABASE_DIR / "supply_chain.db"
+
+# --------------------------------------------------------------------------- #
+# Storage backend
+# --------------------------------------------------------------------------- #
+# "sqlite"   -> local file at DATABASE_PATH (default, no setup required)
+# "postgres" -> managed PostgreSQL (Neon) via DATABASE_URL
+DB_BACKEND = os.getenv("DB_BACKEND", "sqlite").strip().lower()
+
+# SQLAlchemy URL for the PostgreSQL backend, e.g.
+#   postgresql+psycopg2://user:password@host/dbname?sslmode=require
+# Supplied through the environment so credentials never live in the repo.
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+
+# Rows per INSERT batch when loading to PostgreSQL over the network.
+LOAD_CHUNK_SIZE = int(os.getenv("LOAD_CHUNK_SIZE", "10000"))
 
 # --------------------------------------------------------------------------- #
 # Columns considered Personally Identifiable Information (dropped on ingest)

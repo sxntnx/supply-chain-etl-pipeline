@@ -167,10 +167,13 @@ def build_fact_orders(df: pd.DataFrame) -> pd.DataFrame:
     }
     fact = _select_rename(df, mapping).reset_index(drop=True)
 
-    # Dates stored as ISO 8601 text for portable SQLite storage.
+    # Emit real `date` objects rather than formatted strings: PostgreSQL
+    # stores them in a native DATE column, and SQLite still writes ISO 8601
+    # text. Formatting here would force every downstream date filter through
+    # a string comparison.
     for date_col in ("order_date", "ship_date"):
         if date_col in fact.columns:
-            fact[date_col] = fact[date_col].dt.strftime("%Y-%m-%d")
+            fact[date_col] = fact[date_col].dt.date
 
     log.info("fact_orders:   %s rows", fmt_int(len(fact)))
     return fact

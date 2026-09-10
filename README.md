@@ -1,11 +1,15 @@
 # Supply Chain ETL Pipeline
 
 An end-to-end ETL pipeline that extracts raw supply chain data, applies data
-quality transformations, and loads a normalized **star schema** into a SQLite
+quality transformations, and loads a normalized **star schema** into an
 analytical database — ready to answer real operational questions about
 delivery performance and profitability.
 
-Built with **Python · Pandas · SQLite**
+Runs against **managed PostgreSQL in the cloud** (Neon) or a local **SQLite**
+file, selected by one environment variable. The extract and transform stages
+are identical either way.
+
+Built with **Python · Pandas · SQLAlchemy · PostgreSQL / SQLite**
 
 ---
 
@@ -36,10 +40,13 @@ data/raw/
         └── fact_orders     (one row per order line)
                 │
                 ▼
-          [load.py]         → SQLite + indexes
+          [load.py]         → typed schema + PKs + indexes
                 │
-                ▼
-     database/supply_chain.db
+        ┌───────┴────────┐
+        ▼                ▼
+  Neon PostgreSQL   database/supply_chain.db
+   (DB_BACKEND=       (DB_BACKEND=sqlite)
+     postgres)
 ```
 
 ---
@@ -67,8 +74,8 @@ data/raw/
 | order_id | INTEGER | Order identifier |
 | order_customer_id | INTEGER | FK → dim_customers |
 | product_id | INTEGER | FK → dim_products |
-| order_date | TEXT | Order date (ISO 8601) |
-| ship_date | TEXT | Shipping date (ISO 8601) |
+| order_date | DATE | Order date |
+| ship_date | DATE | Shipping date |
 | quantity | INTEGER | Units ordered |
 | sales | REAL | Revenue |
 | order_profit | REAL | Profit per order |
@@ -84,8 +91,9 @@ Unique customers with segment, city, state, country, zipcode.
 ### `dim_products`
 Unique products with category, department, list price.
 
-Indexes are created on the fact table's foreign keys and on `is_late_delivery`
-to keep the analytical queries fast.
+Primary keys are declared on all three tables, and indexes cover the fact
+table's foreign keys, `is_late_delivery` and `order_date` — the columns the
+KPI queries below actually filter and join on.
 
 ---
 
@@ -111,7 +119,24 @@ runs end-to-end out of the box:
 python scripts/generate_sample_data.py --rows 20000
 ```
 
-### 3. Run the pipeline
+### 3. Choose where the data lands
+
+**Option A — Cloud PostgreSQL (Neon).** Create a free project at
+[neon.com](https://neon.com/), copy its connection string, then:
+
+```bash
+cp .env.example .env
+# edit .env:
+#   DB_BACKEND=postgres
+#   DATABASE_URL=postgresql+psycopg2://USER:PASSWORD@HOST/DBNAME?sslmode=require
+```
+
+**Option B — Local SQLite.** Nothing to configure; this is the default when no
+`.env` is present.
+
+`.env` is git-ignored: credentials never enter the repository.
+
+### 4. Run the pipeline
 ```bash
 python main.py
 ```
@@ -139,6 +164,10 @@ The point of modeling the data is to query it. `sql/analytics_queries.sql`
 contains the operational questions this schema was built to answer:
 
 ```bash
+# PostgreSQL / Neon
+psql "$DATABASE_URL" -f sql/analytics_queries.sql
+
+# SQLite
 sqlite3 database/supply_chain.db < sql/analytics_queries.sql
 ```
 
@@ -169,7 +198,7 @@ supply-chain-etl/
 ├── src/
 │   ├── extract.py              # Stage 1: load raw data
 │   ├── transform.py            # Stage 2: clean, enrich, model
-│   ├── load.py                 # Stage 3: write to SQLite + index
+│   ├── load.py                 # Stage 3: write to Postgres/SQLite + index
 │   └── utils.py                # Logger and helpers
 ├── scripts/
 │   ├── generate_sample_data.py # Synthetic DataCo-style data generator
@@ -178,7 +207,8 @@ supply-chain-etl/
 │   └── analytics_queries.sql   # Operational KPI queries
 ├── reports/
 │   └── kpi_dashboard.png       # Generated KPI visuals
-├── config.py                   # Paths and settings
+├── config.py                   # Paths, backend selection, settings
+├── .env.example                # Template for local credentials
 ├── main.py                     # Pipeline entry point
 ├── requirements.txt
 └── README.md
@@ -191,7 +221,9 @@ supply-chain-etl/
 - **Modular stages** — extract / transform / load are isolated and independently testable. Each transform step is a small pure function.
 - **Config-driven** — paths, PII columns and settings live in `config.py`; no module hard-codes a path.
 - **Star schema** — separating dimensions from facts keeps the fact table narrow and analytical joins cheap.
-- **SQLite** — zero-infrastructure. Because persistence is isolated in `load.py`, swapping to PostgreSQL is a one-function change.
+- **Pluggable storage** — persistence is isolated in `load.py` behind a single SQLAlchemy engine factory, so PostgreSQL and SQLite are one environment variable apart. Cloud Postgres for a shareable, BI-connectable warehouse; SQLite for a zero-setup local run.
+- **Typed schema, not inferred** — explicit column types, primary keys and indexes are declared on load rather than left to pandas' inference, so the database documents its own grain.
+- **Credentials out of the repo** — the connection string is read from the environment via `.env`, which is git-ignored; `.env.example` documents the shape.
 - **Reproducible** — the synthetic generator means anyone can run the full pipeline without hunting down the source data.
 
 ---
