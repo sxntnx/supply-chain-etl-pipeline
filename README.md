@@ -108,7 +108,9 @@ KPI queries below actually filter and join on.
 ```bash
 git clone https://github.com/sxntnx/supply-chain-etl-pipeline.git
 cd supply-chain-etl-pipeline
-pip install -r requirements.txt
+python -m venv .venv
+source .venv/bin/activate          # Windows: .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt    # add -r requirements-dev.txt to run the tests
 ```
 
 ### 2. Get the data — two options
