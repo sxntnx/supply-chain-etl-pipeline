@@ -3,6 +3,7 @@
 [![CI](https://github.com/sxntnx/supply-chain-etl-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/sxntnx/supply-chain-etl-pipeline/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.11-blue)
 ![Tests](https://img.shields.io/badge/tests-31%20passing-brightgreen)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 An end-to-end ETL pipeline that extracts raw supply chain data, applies data
 quality transformations, and loads a normalized **star schema** into an
@@ -263,6 +264,7 @@ supply-chain-etl/
 ├── reports/
 │   └── kpi_dashboard.png       # Generated KPI visuals
 ├── config.py                   # Paths, backend selection, settings
+├── LICENSE                     # MIT
 ├── conftest.py                 # Puts the repo root on sys.path for tests
 ├── pyproject.toml              # pytest and ruff configuration
 ├── .env.example                # Template for local credentials
@@ -293,3 +295,9 @@ supply-chain-etl/
 **DataCo Smart Supply Chain for Big Data Analysis**
 Source: [Kaggle](https://www.kaggle.com/datasets/shashwatwork/dataco-smart-supply-chain-for-big-data-analysis)
 ~180K order records across global markets — orders, shipping, customers, products.
+
+---
+
+## License
+
+Released under the [MIT License](LICENSE). © 2026 Santino Spelzini.
